@@ -19,7 +19,7 @@ app = Flask(__name__)
 
 # ===== CONFIGURATION =====
 LINE_CHANNEL_SECRET = "c7170bf37496fe59e045e65cc928b824"
-LINE_CHANNEL_ACCESS_TOKEN = "fmFL1YGzs3ZELp+Os0VYmD027BZ7VZNPijimDWDtmVDfCul12HhhHAqljSrDP9veXIHj0RvIXEBPxFx5hkJg0g2H7UljTBBuQtcLCwy3DILm7DnWJ+gcLQ7ZAN/wfJDg10zNKyjfj50/fCcZj+RatQdB04t89/1O/w1cDnyilFU="
+LINE_CHANNEL_ACCESS_TOKEN = "7R2qhtTuTWxSNKknEKHaAlX2okOAXgUJDZfjma6Mx7sE6E0HUUL+P5IiLZkUAChKXIHj0RvIXEBPxFx5hkJg0g2H7UljTBBuQtcLCwy3DIINhPk+XMkiK1HdbBet3v3NZSOQjhgfBvOehyNljQwzBgdB04t89/1O/w1cDnyilFU="
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 
@@ -239,14 +239,13 @@ def start_localtunnel():
         print(f"⚠️ Error starting Localtunnel: {str(e)}")
         sys.exit(1)
 
+from waitress import serve
+
 if __name__ == "__main__":
-    # Start Localtunnel before running the Flask app
     lt_process = start_localtunnel()
     try:
-        # Start the Flask app
-        app.run(host="0.0.0.0", port=5000)
+        serve(app, host="0.0.0.0", port=5000, threads=8)
     finally:
-        # Ensure Localtunnel process is terminated when Flask app stops
         lt_process.terminate()
         lt_process.wait()
 
