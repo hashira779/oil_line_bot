@@ -27,10 +27,10 @@ configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 API_KEY = "your-secure-api-key-here"  # Replace with a strong, unique key
 
 DB_CONFIG = {
-    "host": "10.1.0.47",
+    "host": "localhost",
     "user": "root",
-    "password": "pTT!CT01",
-    "database": "testing_db"
+    "password": "",
+    "database": "oil_db"
 }
 
 def get_sales_data(date):
