@@ -24,7 +24,7 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 
 # API key for securing the endpoint
-API_KEY = "your-secure-api-key-here"  # Replace with a strong, unique key
+API_KEY = "your-secure-api-key-here"  # Replace it with a strong, unique key
 
 DB_CONFIG = {
     "host": "localhost",
