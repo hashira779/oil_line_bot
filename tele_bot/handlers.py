@@ -29,51 +29,64 @@ class BotHandlers:
             "You can also:\n"
             "- Type a station name (e.g., 'Neak Vorn') to get its details.\n"
             "- Type a service (e.g., 'ev', 'fleet', 'wing', 'amazon') to find stations offering that service.\n"
-            "- Use /clear to clear recent messages in this chat."
+            "- Use /clear to clear all messages in this chat (may take time for large chats)."
         )
         keyboard = [[InlineKeyboardButton("📍 Allow Location Access", callback_data="allow_location")],
                     [InlineKeyboardButton("⏭️ Skip", callback_data="skip_location")]]
         await update.message.reply_text(welcome_message, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def clear(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle the /clear command to delete recent messages in the chat."""
+        """Handle the /clear command to delete all messages in the chat."""
         chat_id = update.message.chat_id
         current_message_id = update.message.message_id
         chat_type = update.message.chat.type
-        max_messages_to_delete = 50  # Reduced default limit for faster performance
-        batch_size = 10  # Process in batches to avoid rate limits
+        batch_size = 20  # Batch size for deletion
+        deleted_count = 0
 
         try:
             if chat_type != "private":
-                # Try bulk deletion for group/supergroup chats
-                message_ids = list(range(current_message_id - max_messages_to_delete, current_message_id + 1))
-                try:
-                    await context.bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
-                    await update.message.reply_text(f"🧹 Cleared up to {len(message_ids)} recent messages.")
+                # Check bot permissions in group chats
+                chat_member = await context.bot.get_chat_member(chat_id=chat_id, user_id=context.bot.id)
+                if not chat_member.can_delete_messages:
+                    logger.error("Bot lacks 'Delete Messages' permission in group chat.")
                     return
-                except Exception as e:
-                    logger.debug(f"Bulk deletion failed: {e}. Falling back to individual deletion.")
 
-            # Individual deletion for private chats or fallback for groups
-            deleted_count = 0
-            for start_id in range(current_message_id, current_message_id - max_messages_to_delete, -batch_size):
-                batch_ids = range(max(start_id - batch_size + 1, current_message_id - max_messages_to_delete), start_id + 1)
-                delete_tasks = [
-                    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-                    for message_id in batch_ids
-                ]
-                results = await asyncio.gather(*delete_tasks, return_exceptions=True)
-                deleted_count += sum(1 for result in results if not isinstance(result, Exception))
-                await asyncio.sleep(0.1)  # Small delay to respect rate limits
+                # Bulk deletion for group/supergroup chats
+                message_id = current_message_id
+                while message_id > 0:
+                    batch_ids = list(range(max(message_id - batch_size + 1, 1), message_id + 1))
+                    try:
+                        await context.bot.delete_messages(chat_id=chat_id, message_ids=batch_ids)
+                        deleted_count += len(batch_ids)
+                        message_id -= batch_size
+                        await asyncio.sleep(0.05)  # Minimal delay to avoid rate limits
+                    except Exception as e:
+                        logger.debug(f"Bulk deletion failed at message {message_id}: {e}")
+                        if "message to delete not found" in str(e).lower() or "chat not found" in str(e).lower():
+                            break  # No more messages to delete
+                        message_id -= 1  # Skip problematic message
+                        await asyncio.sleep(0.2)  # Longer delay for error recovery
 
-            await update.message.reply_text(
-                f"🧹 Cleared {deleted_count} recent message{'s' if deleted_count != 1 else ''}."
-            )
+            else:
+                # Batch deletion for private chats
+                message_id = current_message_id
+                while message_id > 0:
+                    batch_ids = range(max(message_id - batch_size + 1, 1), message_id + 1)
+                    delete_tasks = [
+                        context.bot.delete_message(chat_id=chat_id, message_id=mid)
+                        for mid in batch_ids
+                    ]
+                    results = await asyncio.gather(*delete_tasks, return_exceptions=True)
+                    deleted_count += sum(1 for result in results if not isinstance(result, Exception))
+                    message_id -= batch_size
+                    await asyncio.sleep(0.05)  # Minimal delay to avoid rate limits
+                    if all(isinstance(result, Exception) for result in results):
+                        # If all deletions failed, likely no more messages
+                        break
+
+            logger.info(f"Cleared {deleted_count} messages in chat {chat_id}.")
         except Exception as e:
-            logger.error(f"Error clearing messages: {e}")
-            await update.message.reply_text(
-                "⚡ Failed to clear messages. Please ensure I have permission to delete messages."
-            )
+            logger.error(f"Error clearing messages in chat {chat_id}: {e}")
 
     async def find_nearest_stations(self, update: Update, context: ContextTypes.DEFAULT_TYPE, service_key: str = None):
         """Find nearest stations, optionally filtered by service or product."""
